@@ -1,6 +1,6 @@
 FROM debian:jessie
 
-MAINTAINER MirHosting <support@ddosov.net>
+MAINTAINER ddosov.net <support@ddosov.net>
 
 RUN export DEBIAN_FRONTEND=noninteractive
 RUN apt-get -y update
@@ -14,6 +14,7 @@ RUN apt-get --reinstall install bsdutils
 
 COPY postinstall.sh /usr/local/src/postinstall.sh
 COPY tuning.sh /usr/local/src/tuning.sh
+COPY sshd_config /etc/ssh/sshd_config
 COPY genkeys.sh /usr/local/src/genkeys.sh
 
 RUN chmod +x /usr/local/src/postinstall.sh
