@@ -20,6 +20,7 @@ COPY dhcpv6_hack.sh /etc/init.d/dhcpv6_hack.sh
 COPY resolv.conf /etc/resolv.conf
 COPY jelinit /etc/init.d/jelinit
 COPY genkeys.sh /usr/local/src/genkeys.sh
+COPY policy-rc.d /usr/sbin/policy-rc.d
 
 RUN chmod +x /usr/local/src/postinstall.sh
 RUN chmod +x /usr/local/src/tuning.sh
