@@ -1,4 +1,13 @@
 #!/bin/bash
+### BEGIN INIT INFO
+# Provides: tuning sql
+# Required-Start: $remote_fs $syslog
+# Required-Stop: $remote_fs $syslog
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Short-Description: tuning sql
+# Description: tuning sql.
+### END INIT INFO
 # Tuning SSH
 sed -i "s/exit 0/#exit 0/g" /etc/rc.local
 echo "/usr/local/src/genkeys.sh
