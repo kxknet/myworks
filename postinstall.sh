@@ -1,4 +1,13 @@
 #!/bin/bash
+### BEGIN INIT INFO
+# Provides: postinstall.sh
+# Required-Start: $remote_fs $syslog
+# Required-Stop: $remote_fs $syslog
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Short-Description: postinstall isp manager 5
+# Description: postinstall isp manager 5
+### END INIT INFO
 
 # ISPmanager 5 Lite Post-Install script.
 # Instalated: LogRotate, MPM-ITK for HTTPD, Nginx, PHP, AwStat, Exim, RoundCube mail, Named, PhpMyAdmin, FTP-server
