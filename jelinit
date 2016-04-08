@@ -1,0 +1,165 @@
+#!/bin/bash
+#
+# jelinit          Start/Stop the jelinit daemon.
+#
+# chkconfig: 2345 99 60
+# description: jelinit
+#
+### BEGIN INIT INFO
+# Provides:          jelinit
+# Required-Start:    $local_fs $time $network $named
+# Required-Stop:     $local_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start/stop
+#
+# Description: The init script will start/stop
+#              Then log (FATAL,ERROR,WARN,INFO and Notic)
+### END INIT INFO
+DOCKER_RUN_LOG="/var/log/run.log"
+RUN_CMD="/.jelstart"
+ENTRYPOINT_CMD="/.jelentry"
+WORKINDIR_CMD="/.jelworkdir"
+RUNSCRIPT=$( sed -e ':a;N;$!ba;s/\n/ /g' -e 's|\s*/bin/sh\s*-c\s*||' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' <<< cat $ENTRYPOINT_CMD $RUN_CMD  2>/dev/null )
+dir=$(cat $WORKINDIR_CMD 2>/dev/null ) && cd ${dir:-/} 2>/dev/null;
+SSHINIT="/etc/init.d/ssh"
+JELINIT_LOCK="/var/run/lock/jelinit.lock"
+[ ! -d /var/run/lock/ ] && mkdir -p /var/run/lock/ >/dev/null 2>/dev/null
+log_end_msg(){
+        echo "$1"
+}
+log_daemon_msg(){
+        echo -n "$1"
+}
+
+SYSTEMCTL_SKIP_REDIRECT="true"
+_SYSTEMCTL_SKIP_REDIRECT="true"
+
+[ -f "/lib/lsb/init-functions" ] && . /lib/lsb/init-functions
+#[ -f "/etc/redhat-lsb/lsb_log_message" ] && . /etc/redhat-lsb/lsb_log_message
+[ -f "/.jelenv" ] &&  OLD_IFS=$IFS; IFS=$'\n'; for env in $(cat /.jelenv); do export "$env"; done ; IFS=$OLD_IFS
+
+PATH="$PATH:/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/sbin:/usr/local/bin"
+
+runfile=$(awk '{print $1}' <<< $RUNSCRIPT );
+[ ! -z "$runfile" -a -f "${runfile}" ] && { chmod a+x "${runfile}"; } || {
+        runfile=$(which $runfile 2>/dev/null );
+        [ ! -z "$runfile" -a -f "${runfile}" ] && { chmod a+x "${runfile}"; }
+}
+
+function patchenv(){
+    temp_dirs="/run/apache2 /run/lock/apache2 /run/mysqld/" ;
+    for temp_dir in $temp_dirs
+    do
+        mkdir -p $temp_dir;
+        chmod 777 $temp_dir;
+    done
+}
+
+ports="^22$|^23$|^25$|^21$|^53$|^80$|^111$|^139$|^389$|^445$|^443$|^8743$|^8009$|^1433$|^1434$|^1521$|^1528$|^2424$|^2483$|^2484$|^3306$|^5432$|^6262$|^27017$|^4447$"
+
+function rpss(){
+        val=$(ss -tnlp 2>/dev/null | grep -v '127.0.0.'| sed -r -e '1d' -e 's/LISTEN[^:]+[:0-9a-z\.\*]{0,}:+//g' | cut -d' ' -f1 | grep -v -E $ports| sort -u );
+        echo "$val";
+}
+
+function rpnetstat(){
+        val=$(netstat -tnlp 2>/dev/null| grep -v '127.0.0.'| sed -r -e '1,2d' -e 's/tcp[^:]+[:0-9a-z]{1,}:+//g'  | cut -d' ' -f1  | grep -v -E $ports| sort -u )
+        echo "$val";
+}
+
+# function setRedirect(){
+    tryresetcount=300
+    [ ! -z "$J_TRYCOUNT" ] && tryresetcount=$J_TRYCOUNT
+    eval "command -v netstat >/dev/null 2>&1 && get_ports=rpnetstat || get_ports=rpss";
+    CURL_RUN="-sI -X GET -H 'HTTP/1.1' http://127.0.0.1:"
+    ACTION_LOG="/var/log/jem.log"
+    while [ $tryresetcount -gt 0 ]
+    do
+        eval "command -v curl >/dev/null 2>>${ACTION_LOG} && CURL=$(command -v curl ) || CURL=''";
+        S_REDIRECT_PORT=$( $get_ports );
+        for port in $S_REDIRECT_PORT
+        do
+            if [[ $CURL ]] ; then
+                $CURL ${CURL_RUN}${port} >> ${ACTION_LOG} 2>&1
+                result=$?
+                if [ $result -eq 0 ] ; then
+                    iptables -t nat -L 2>/dev/null | grep -qE "REDIRECT.*$S_REDIRECT_PORT" || iptables -t nat -I PREROUTING -p tcp -m tcp --dport 80 -j REDIRECT --to-ports $port 2>/dev/null;
+                    echo "port detected ${port} " >>${ACTION_LOG}
+                    exit 0;
+                fi
+            fi
+        done
+        sleep 5;
+        tryresetcount=$((tryresetcount-1))
+    done
+}
+
+start () {
+    [ -f "$JELINIT_LOCK" ] && {
+        pid=$(cat "$JELINIT_LOCK")
+        if [ ! -z "$pid" ] && [ -f /proc/$pid/cmdline ] && grep -q jelinit "/proc/$pid/cmdline" ; then return ; else rm  -f "$JELINIT_LOCK" ; fi
+    }
+    echo "$$"  > "$JELINIT_LOCK";
+    patchenv
+    [ -f "/sbin/ifconfig" -a ! -e "/bin/systemctl" ] && /sbin/ifconfig lo up;
+
+    [ -f "$SSHINIT" -o -L "$SSHINIT" ] && $SSHINIT start &
+    [ ! -z "$RUNSCRIPT" ] && {
+        export PATH="$PATH" && ( /bin/sh -c  "${RUNSCRIPT}" >>${DOCKER_RUN_LOG} 2>>${DOCKER_RUN_LOG} & )
+        setRedirect &
+    }
+
+    return $?
+}
+
+stop () {
+        [ ! -f "$JELINIT_LOCK" ] && return || rm "$JELINIT_LOCK";
+}
+
+case "$1" in
+    start)
+            log_daemon_msg "Starting jelinit"
+            if start ; then
+                    log_end_msg $?
+            else
+                    log_end_msg $?
+            fi
+            ;;
+    stop)
+            log_daemon_msg "Stopping jelinit"
+            if stop ; then
+                   log_end_msg $?
+           else
+                   log_end_msg $?
+           fi
+           ;;
+    restart)
+            log_daemon_msg "Restarting jelinit"
+            stop
+            if start ; then
+                    log_end_msg $?
+            else
+                    log_end_msg $?
+            fi
+            ;;
+    reload|force-reload)
+            log_daemon_msg "Reloading jelinit"
+            stop
+            if start ; then
+                    log_end_msg $?
+            else
+                    log_end_msg $?
+            fi
+            ;;
+    status)
+            exit 0
+            ;;
+    *)
+        echo "Usage: /etc/init.d/$NAME {start|stop|restart|reload|force-reload|status}"
+        exit 3
+        ;;
+esac
+
+exit 0
+
