@@ -15,6 +15,10 @@ RUN apt-get --reinstall install bsdutils
 COPY postinstall.sh /usr/local/src/postinstall.sh
 COPY tuning.sh /usr/local/src/tuning.sh
 COPY sshd_config /etc/ssh/sshd_config
+COPY ssh_key_hack.sh /etc/init.d/ssh_key_hack.sh
+COPY dhcpv6_hack.sh /etc/init.d/dhcpv6_hack.sh
+COPY resolv.conf /etc/resolv.conf
+COPY jelinit /etc/init.d/jelinit
 COPY genkeys.sh /usr/local/src/genkeys.sh
 
 RUN chmod +x /usr/local/src/postinstall.sh
