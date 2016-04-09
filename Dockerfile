@@ -11,6 +11,7 @@ RUN apt-get -y install openssh-server
 
 RUN apt-get -y update
 RUN apt-get --reinstall install bsdutils
+RUN fuser -vki /var/lib/dpkg/lock
 
 COPY postinstall.sh /usr/local/src/postinstall.sh
 COPY tuning.sh /usr/local/src/tuning.sh
@@ -27,6 +28,7 @@ RUN chmod +x /usr/local/src/tuning.sh
 RUN chmod +x /usr/local/src/genkeys.sh
 RUN apt-get -y remove exim4 exim4-base exim4-config exim4-daemon-light
 RUN apt-get -y purge exim4 exim4-base exim4-config exim4-daemon-light
+RUN fuser -vki /var/lib/dpkg/lock
 RUN rm -rf /etc/init.d/apache2
 
 
